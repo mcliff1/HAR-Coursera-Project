@@ -1,0 +1,90 @@
+---
+title: "HAR Exercise Quality"
+author: "Matt Cliff"
+date: "January 26, 2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+require(dplyr)
+require(caret)
+
+```
+
+## Human Activity Recognition
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement – a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset).
+
+Six young health participants were asked to perform one set of 10 repetitions of the Unilateral Dumbbell Biceps Curl in five different fashions: exactly according to the specification (Class A), throwing the elbows to the front (Class B), lifting the dumbbell only halfway (Class C), lowering the dumbbell only halfway (Class D) and throwing the hips to the front (Class E).
+
+Read more: http://groupware.les.inf.puc-rio.br/har#ixzz55KOSz1Ls
+
+
+```{r loaddata}
+test_datafile <- "./data/pml-testing.csv"
+train_datafile <- "./data/pml-training.csv"
+train_fileURL <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+test_fileURL <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+dir.create("data", showWarnings=FALSE)
+if(!file.exists(train_datafile)) {
+    download.file(train_fileURL, destfile=train_datafile)
+}
+if(!file.exists(test_datafile)) {
+    download.file(test_fileURL, destfile=test_datafile)
+}
+raw_train <- read.csv(train_datafile)
+raw_test <- read.csv(test_datafile)
+```
+
+## Including Plots
+
+Clear out the columns which are blank (inspection will )
+```{r cleanData, echo=TRUE}
+M1 <- sapply(raw_train, function(x) sum(is.na(x))); M1 <- M1[M1 > 0]
+M2 <- sapply(raw_train, function(x) sum(x == "", na.rm=TRUE)); M2 <- M2[M2 > 0]
+training <- select(raw_train, -c(X, user_name, raw_timestamp_part_1, raw_timestamp_part_2, cvtd_timestamp, new_window, num_window)) %>%
+    select( -one_of(names(M1))) %>%
+    select( -one_of(names(M2)))
+
+testing <- select(raw_test, -c(X, user_name, raw_timestamp_part_1, raw_timestamp_part_2, cvtd_timestamp, new_window, num_window)) %>%
+    select( -one_of(names(M1))) %>%
+    select( -one_of(names(M2)))
+```
+
+Now we can go ahead and train thde models, in this case we will train 3 models
+
+```{r trainModel}
+rf_fit <- train(classe ~ ., data=training, method="rf")
+rf_pred <- predict(rf_fit, newdata=testing)
+
+gbm_fit <- train(classe ~ ., data=training, method="gbm", verbose=FALSE)
+gbm_pred <- predict(gbm_fit, newdata=testing)
+
+lda_fit <- train(classe ~ ., data=training, method="lda")
+lda_pred <- predict(lda_fit, newdata=testing)
+```
+
+That took a while!  let's look at the results
+```{r matrixResults}
+confusionMatrix(rf_pred, testing)
+confusionMatrix(rf_pred, testing)$overall[1]
+confusionMatrix(gbm_pred, testing)$overall[1]
+confusionMatrix(lda_pred, testing)$overall[1]
+confusionMatrix(rf_pred, gbm_pred)$overall[1]
+confusionMatrix(rf_pred, lda_pred)$overall[1]
+confusionMatrix(gbm_pred, lda_pred)$overall[1]
+
+```
+
+And finally make an overall final prediction
+```{r combined prediction}
+predDF <- data.frame(rf_pred, gbm_pred, lda_pred, classe=testing$classe)
+predDF
+
+combModFit <- train(diagnosis ~ ., method="rf", data=predDF)
+combPred <- predict(combModFit, predDF)
+combPred
+
+
+```
