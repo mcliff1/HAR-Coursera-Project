@@ -3,6 +3,18 @@
 
 
 setwd("H:/Programming/Coursera/Machine Learning/project/")
+
+require(caret)
+require(randomForest)
+#require(ElemStatLearn)
+#require(pgmm)
+require(rpart)
+require(gbm)
+#require(lubridate)
+#require(forecast)
+#require(e1071)
+require(dplyr)
+
 test_datafile <- "./data/pml-testing.csv"
 train_datafile <- "./data/pml-training.csv"
 train_fileURL <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
@@ -25,8 +37,8 @@ raw_test <- read.csv(test_datafile)
 #out of the 160 variables how many of them are 'low' in data
 #   or information ???
 
-M1 <- sapply(raw_test, function(x) sum(is.na(x))); M1 <- M1[M1 > 0]
-M2 <- sapply(raw_test, function(x) sum(x == "", na.rm=TRUE)); M2 <- M2[M2 > 0]
+M1 <- sapply(raw_train, function(x) sum(is.na(x))); M1 <- M1[M1 > 0]
+M2 <- sapply(raw_train, function(x) sum(x == "", na.rm=TRUE)); M2 <- M2[M2 > 0]
 training <- select(raw_train, -c(X, user_name, raw_timestamp_part_1, raw_timestamp_part_2, cvtd_timestamp, new_window, num_window)) %>%
     select( -one_of(names(M1))) %>%
     select( -one_of(names(M2)))
@@ -39,14 +51,6 @@ testing <- select(raw_test, -c(X, user_name, raw_timestamp_part_1, raw_timestamp
 summary(training$new_window)
 names(training)
 
-require(caret)
-require(ElemStatLearn)
-require(pgmm)
-require(rpart)
-require(gbm)
-require(lubridate)
-require(forecast)
-require(e1071)
 rf_fit <- train(classe ~ ., data=training, method="rf")
 rf_pred <- predict(rf_fit, newdata=testing)
 

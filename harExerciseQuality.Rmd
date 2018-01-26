@@ -9,6 +9,10 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 require(dplyr)
 require(caret)
+require(rpart)
+require(randomForest)
+require(ggplot2)
+require(forecast)
 
 ```
 
