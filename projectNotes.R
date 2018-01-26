@@ -63,45 +63,8 @@ lda_pred <- predict(lda_fit, newdata=testing)
 # note it took at least 30 minutes to run the first one
 #   the thid one failed "accuracy metric values missing"
 
-# this cleans out the things that are na
-M <- (sapply(training, function(x) sum(is.na(x)))); M[M>0]
-length(M[M>0])
-t2 <- select(training, -one_of(names(M[M>0])))
-t2
-
-M2 <- sapply(t2, function(x) sum(x == ""))
-length(M2[M2>0])
-M2[M2>0]
-
-t3 <- select(t2, -one_of(names(M2[M2>0])))
-
-summary(t3)
-
-
-# we don't want the number, or timestamps either
-#  not sure what 'new_window' is
-t4 <- select(t3, -c(X, user_name, raw_timestamp_part_1, raw_timestamp_part_2, cvtd_timestamp))
-             
-rf_fit <- train(classe ~ ., data=t4, method="rf", na.action=na.exclude)
-
-testing4 <- select(testing, -one_of(names(M[M>0]))) %>%
-    select( -one_of(names(M2[M2>0]))) %>%
-    select( -c(X, user_name, raw_timestamp_part_1, raw_timestamp_part_2, cvtd_timestamp))
-
-rf_pred <- predict(rf_fit, newdata=testing4)
-
-
-gbm_fit <- train(classe ~ ., data=t4, method="gbm", verbose=FALSE)
-gbm_pred <- predict(gbm_fit, newdata=testing4)
-gbm_pred
-
-lda_fit <- train(classe ~ ., data=t4, method="lda")
-
-lda_pred <- predict(lda_fit, newdata=testing4)
-lda_pred
-
 confusionMatrix(rf_pred, lda_pred)$overall[1]
-confusionMatrix(gbm_fit, testing$classe)$overall[1]
+confusionMatrix(gbm_pred, testing$classe)$overall[1]
 confusionMatrix(lda_pred, testing$diagnosis)$overall[1]
 
 confusionMatrix(combPred, testing$diagnosis)$overall[1]

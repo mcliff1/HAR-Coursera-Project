@@ -25,6 +25,10 @@ Six young health participants were asked to perform one set of 10 repetitions of
 Read more: http://groupware.les.inf.puc-rio.br/har#ixzz55KOSz1Ls
 
 
+### System Requirements
+Needs at least 2 GB of RAM, initial work was on a windows workstation(I7 core; 16GB RAM) and would take 10 minutes to run a random forest on 19,622 observations with 53 variables.
+
+
 ```{r loaddata}
 test_datafile <- "./data/pml-testing.csv"
 train_datafile <- "./data/pml-training.csv"

@@ -1,2 +1,6 @@
 # data folder
 /data/
+
+# R
+.Rhistory
+.RData
