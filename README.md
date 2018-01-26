@@ -19,6 +19,12 @@ If needed repeat
 How to run everything example
 ```
 
+## Data
+
+The training data is available here (https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv), the test data is available (https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv)
+
+The data for this project came from the source (http://groupware.les.inf.puc-rio.bar/har) which tracks Human Activity observations.
+
 ## Built With
 
 * [R](http://R/) - R Studio
