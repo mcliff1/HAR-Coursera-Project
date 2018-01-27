@@ -13,7 +13,7 @@ require(rpart)
 require(randomForest)
 require(ggplot2)
 require(forecast)
-
+require(tictoc)
 ```
 
 ## Human Activity Recognition
@@ -45,54 +45,88 @@ raw_train <- read.csv(train_datafile)
 raw_test <- read.csv(test_datafile)
 ```
 
-## Including Plots
+## Run Models
 
 Clear out the columns which are blank (inspection will )
 ```{r cleanData, echo=TRUE}
 M1 <- sapply(raw_train, function(x) sum(is.na(x))); M1 <- M1[M1 > 0]
 M2 <- sapply(raw_train, function(x) sum(x == "", na.rm=TRUE)); M2 <- M2[M2 > 0]
-training <- select(raw_train, -c(X, user_name, raw_timestamp_part_1, raw_timestamp_part_2, cvtd_timestamp, new_window, num_window)) %>%
+training_validation <- select(raw_train, -c(X, user_name, raw_timestamp_part_1, raw_timestamp_part_2, cvtd_timestamp, new_window, num_window)) %>%
     select( -one_of(names(M1))) %>%
     select( -one_of(names(M2)))
 
 testing <- select(raw_test, -c(X, user_name, raw_timestamp_part_1, raw_timestamp_part_2, cvtd_timestamp, new_window, num_window)) %>%
     select( -one_of(names(M1))) %>%
     select( -one_of(names(M2)))
+
+inTrain = createDataPartition(training_validation$classe, p = 0.7)[[1]]
+training = training_validation[ inTrain,]
+validation = training_validation[-inTrain,]
+
 ```
 
 Now we can go ahead and train thde models, in this case we will train 3 models
 
 ```{r trainModel}
+tic("rf model")
 rf_fit <- train(classe ~ ., data=training, method="rf")
-rf_pred <- predict(rf_fit, newdata=testing)
+rf_pred <- predict(rf_fit, newdata=validation)
+toc()
 
+tic("gbm model")
 gbm_fit <- train(classe ~ ., data=training, method="gbm", verbose=FALSE)
-gbm_pred <- predict(gbm_fit, newdata=testing)
+gbm_pred <- predict(gbm_fit, newdata=validation)
+toc()
 
+tic("lda model")
 lda_fit <- train(classe ~ ., data=training, method="lda")
-lda_pred <- predict(lda_fit, newdata=testing)
+lda_pred <- predict(lda_fit, newdata=validation)
+toc()
 ```
 
 That took a while!  let's look at the results
 ```{r matrixResults}
-confusionMatrix(rf_pred, testing)
-confusionMatrix(rf_pred, testing)$overall[1]
-confusionMatrix(gbm_pred, testing)$overall[1]
-confusionMatrix(lda_pred, testing)$overall[1]
-confusionMatrix(rf_pred, gbm_pred)$overall[1]
-confusionMatrix(rf_pred, lda_pred)$overall[1]
-confusionMatrix(gbm_pred, lda_pred)$overall[1]
+#lda_fit$finalModel
+#lda_pred
+#confusionMatrix(rf_pred, validation)
+#confusionMatrix(rf_pred, validation)$overall[1]
+
+#confusionMatrix(gbm_pred, validation)$overall[1]
+#confusionMatrix(lda_pred, validation)$overall[1]
+#confusionMatrix(rf_pred, gbm_pred)$overall[1]
+#confusionMatrix(rf_pred, lda_pred)$overall[1]
+#confusionMatrix(gbm_pred, lda_pred)$overall[1]
 
 ```
 
 And finally make an overall final prediction
 ```{r combined prediction}
-predDF <- data.frame(rf_pred, gbm_pred, lda_pred, classe=testing$classe)
-predDF
 
-combModFit <- train(diagnosis ~ ., method="rf", data=predDF)
-combPred <- predict(combModFit, predDF)
-combPred
+rf_pred <- predict(rf_fit, newdata=training)
+gbm_pred <- predict(gbm_fit, newdata=training)
+lda_pred <- predict(lda_fit, newdata=training)
 
+predDF <- data.frame(rf_pred, gbm_pred, lda_pred, classe=training$classe)
+#predDF
+
+combModFit <- train(classe ~ ., method="rf", data=predDF)
+
+
+#combPred <- predict(combModFit, predDF)
+#combPred
+
+
+```
+Now,  we have the model that takes the predictions from the other models,   to do a final prediction lets take those trained models and build them on the test set
+```{r finalPrediction}
+rf_pred_final <- predict(rf_fit, newdata=training)
+gbm_pred_final <- predict(gbm_fit, newdata=training)
+lda_pred_final <- predict(lda_fit, newdata=training)
+predDF_final = data.frame(re_pred=rf_pred_final,
+                          gbm_pred=gbm_pred_final, lda_pred=lda_pred_final)
+pred_final = predict(comPred, predDF_final)
+
+# print them all out together
+data.frame(re_pred=rf_pred_final,                          gbm_pred=gbm_pred_final, lda_pred=lda_pred_final, classe=pred_final)
 
 ```
