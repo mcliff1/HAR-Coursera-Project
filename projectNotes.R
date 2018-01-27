@@ -86,6 +86,7 @@ testing$classe
 
 confusionMatrix(rf_pred, lda_pred)$overall[1]
 confusionMatrix(gbm_pred, validation$classe)$overall[1]
+confusionMatrix(lda_pred, validation$classe)
 confusionMatrix(lda_pred, validation$classe)$overall[1]
 confusionMatrix(rf_pred, validation$classe)$overall[1]
 confusionMatrix(lda_pred, rf_pred)$overall[1]

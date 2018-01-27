@@ -124,7 +124,8 @@ gbm_pred_final <- predict(gbm_fit, newdata=training)
 lda_pred_final <- predict(lda_fit, newdata=training)
 predDF_final = data.frame(re_pred=rf_pred_final,
                           gbm_pred=gbm_pred_final, lda_pred=lda_pred_final)
-pred_final = predict(comPred, predDF_final)
+
+pred_final = predict(combModFit, predDF_final)
 
 # print them all out together
 data.frame(re_pred=rf_pred_final,                          gbm_pred=gbm_pred_final, lda_pred=lda_pred_final, classe=pred_final)
