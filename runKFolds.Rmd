@@ -1,0 +1,130 @@
+---
+title: "HAR Exercise Quality"
+author: "Matt Cliff"
+date: "January 26, 2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+require(dplyr)
+require(caret)
+require(rpart)
+require(randomForest)
+require(ggplot2)
+require(forecast)
+require(tictoc)
+require(foreach)
+require(doParallel)
+registerDoParallel(cores=4)
+```
+
+## Human Activity Recognition
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement. 
+
+A group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset).
+
+Six young health participants were asked to perform one set of 10 repetitions of the Unilateral Dumbbell Biceps Curl in five different fashions: exactly according to the specification (Class A), throwing the elbows to the front (Class B), lifting the dumbbell only halfway (Class C), lowering the dumbbell only halfway (Class D) and throwing the hips to the front (Class E).
+
+Read more: http://groupware.les.inf.puc-rio.br/har#ixzz55KOSz1Ls
+
+
+### System Requirements
+Needs at least 2 GB of RAM, initial work was on a windows workstation(I7 core; 16GB RAM) and would take 10 minutes to run a random forest on 19,622 observations with 53 variables.
+
+
+```{r loaddata}
+test_datafile <- "./data/pml-testing.csv"
+train_datafile <- "./data/pml-training.csv"
+train_fileURL <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+test_fileURL <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+dir.create("data", showWarnings=FALSE)
+if(!file.exists(train_datafile)) {
+    download.file(train_fileURL, destfile=train_datafile)
+}
+if(!file.exists(test_datafile)) {
+    download.file(test_fileURL, destfile=test_datafile)
+}
+raw_train <- read.csv(train_datafile)
+raw_test <- read.csv(test_datafile)
+```
+
+## Run Models
+
+Clear out the columns which are blank (inspection will )
+```{r cleanData, echo=TRUE}
+M1 <- sapply(raw_train, function(x) sum(is.na(x))); M1 <- M1[M1 > 0]
+M2 <- sapply(raw_train, function(x) sum(x == "", na.rm=TRUE)); M2 <- M2[M2 > 0]
+training_validation <- select(raw_train, -c(X, user_name, raw_timestamp_part_1, raw_timestamp_part_2, cvtd_timestamp, new_window, num_window)) %>%
+    select( -one_of(names(M1))) %>%
+    select( -one_of(names(M2)))
+
+testing <- select(raw_test, -c(X, user_name, raw_timestamp_part_1, raw_timestamp_part_2, cvtd_timestamp, new_window, num_window)) %>%
+    select( -one_of(names(M1))) %>%
+    select( -one_of(names(M2)))
+
+
+inTrain = createDataPartition(training_validation$classe, p = 0.7)[[1]]
+training = training_validation[ inTrain,]
+validation = training_validation[-inTrain,]
+
+```
+
+Now we can go ahead and train thde models, in this case we will train 3 crossfolds with Random Forest models
+
+```{r trainModel}
+flds <- createFolds(training_validation$classe, k = 3, list = TRUE, returnTrain = FALSE)
+
+
+tic("rf model1")
+rf_fit1 <- train(classe ~ ., data=training_validation[-flds[[1]], ], method="parRF")
+rf_pred1 <- predict(rf_fit1, newdata=training_validation[ flds[[1]],])
+toc()
+
+
+tic("rf model2")
+rf_fit2 <- train(classe ~ ., data=training_validation[-flds[[2]], ], method="parRF")
+rf_pred2 <- predict(rf_fit2, newdata=training_validation[ flds[[2]],])
+toc()
+
+
+tic("rf model3")
+rf_fit3 <- train(classe ~ ., data=training_validation[-flds[[3]], ], method="parRF")
+rf_pred3 <- predict(rf_fit3, newdata=training_validation[ flds[[3]],])
+toc()
+```
+
+
+That took a while!  let's look at the results
+```{r matrixResults}
+#lda_fit$finalModel
+#lda_pred
+confusionMatrix(rf_pred1, training_validation[ flds[[1]],]$classe)
+confusionMatrix(rf_pred2, training_validation[ flds[[2]],]$classe)
+confusionMatrix(rf_pred3, training_validation[ flds[[3]],]$classe)
+#confusionMatrix(rf_pred, validation)$overall[1]
+
+
+```
+Now lets go ahead and combine these to make a final prediction, first we combine to make the prediction model
+
+```{r combPredictionModel}
+
+
+# make a dataframe using the full training_validation set
+combined_data <- data.frame(
+    rf1_pred = predict(rf_fit1, newdata_training_validation), 
+    rf2_pred = predict(rf_fit2, newdata_training_validation), 
+    rf3_pred = predict(rf_fit3, newdata_training_validation), 
+    classe=training_validation$classe)
+
+
+tic("fit combined model")
+combined_fit <- train(classe ~ ., data=combined_data, method="parRF")
+combined_pred <- predict(combined_fit, newdata=combined_data)
+toc()
+
+confusionMatrix(combined_pred, combined_data$classe)
+```
+Viola

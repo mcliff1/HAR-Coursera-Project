@@ -93,3 +93,185 @@ confusionMatrix(lda_pred, rf_pred)$overall[1]
 confusionMatrix(lda_pred, gbm_pred)$overall[1]
 confusionMatrix(rf_pred, gbm_pred)$overall[1]
 
+
+
+
+#############################################
+#
+#  Now we hjave lda_fit.RData, gbm_fit.RData, and 
+#   rf_fit.RData all trained
+require(caret)
+
+#
+load(file="rf_fit.RData")
+load(file="gbm_fit.RData")
+load(file="lda_fit.RData")
+
+# prediction on the training set
+lda_p1 <- predict(lda_fit, newdata=training)
+confusionMatrix(lda_p1, training$classe)$overall
+confusionMatrix(lda_p1, training$classe)$table
+
+
+gbm_p1 <- predict(gbm_fit, newdata=training)
+confusionMatrix(gbm_p1, training$classe)$overall
+confusionMatrix(gbm_p1, training$classe)$table
+
+rf_p1 <- predict(rf_fit, newdata=training)
+confusionMatrix(rf_p1, training$classe)$overall
+confusionMatrix(rf_p1, training$classe)$table
+
+
+# validation score
+rf_p2 <- predict(rf_fit, newdata=validation)
+confusionMatrix(rf_p2, validation$classe)$overall
+confusionMatrix(rf_p2, validation$classe)$table
+
+
+gbm_p2 <- predict(gbm_fit, newdata=validation)
+confusionMatrix(gbm_p2, validation$classe)$overall
+confusionMatrix(gbm_p2, validation$classe)$table
+
+lda_p2 <- predict(lda_fit, newdata=validation)
+confusionMatrix(lda_p2, validation$classe)$overall
+confusionMatrix(lda_p2, validation$classe)$table
+
+
+# combined model
+#   you build a model that will guess based on the outputs
+#   from the three other models
+#  the other three model outputs predicted on the training set
+combPredTraining <- data.frame(
+    rf_pred = predict(rf_fit, newdata=training), 
+    gbm_pred = predict(gbm_fit, newdata=training), 
+    lda_pred = predict(gbm_fit, newdata=training), 
+    classe=training$classe)
+
+# build random forest, 13737 observations, with 3 predictors
+comb_fit <- train(classe ~ ., method="rf", data=combPredTraining)
+
+save(file="comb_fit.RData", comb_fit)
+load(file="comb_fit.RData")
+
+# for consitency, get a p1 (training) prediction
+comb_p1 <- predict(comb_fit, newdata=combPredTraining)
+confusionMatrix(comb_p1, combPredTraining$classe)$overall
+confusionMatrix(rf_p1, training$classe)$overall
+# we are exact match for accuracy
+
+
+
+# is it a better fit than original RF (which was pretty good)
+comb_p2 <- predict(comb_fit, newdata=data.frame(
+    rf_pred = predict(rf_fit, newdata=validation), 
+    gbm_pred = predict(gbm_fit, newdata=validation), 
+    lda_pred = predict(gbm_fit, newdata=validation)))
+confusionMatrix(comb_p2, validation$classe)$overall
+confusionMatrix(rf_p2, validation$classe)$overall
+# again exactly the same
+
+
+
+
+#
+#
+#
+#   all sorts of other models
+
+
+# validation score
+tic("Naive Bayes") #assumes, training/validation are setup
+nb_fit <- train(classe ~ ., data=training, method="nb")
+nb_p1 <- predict(nb_fit, newdata=training)
+nb_p2 <- predict(nb_fit, newdata=validation)
+confusionMatrix(nb_p1, training$classe)$overall
+confusionMatrix(nb_p2, validation$classe)$overall
+confusionMatrix(nb_p2, validation$classe)$table
+toc()
+save(nb_fit,file="nb_fit.RData")
+
+# Default Neural Net was about 75% on the training data
+tic("Neural Network") #assumes, training/validation are setup
+nnet_fit <- train(classe ~ ., data=training, method="nnet")
+nnet_p1 <- predict(nb_fit, newdata=training)
+nnet_p2 <- predict(nb_fit, newdata=validation)
+confusionMatrix(nnet_p1, training$classe)$overall
+confusionMatrix(nnet_p2, validation$classe)$overall
+confusionMatrix(nnet_p2, validation$classe)$table
+toc()
+
+tic("Ranger Random Forest") #assumes, training/validation are setup
+ranger_fit <- train(classe ~ ., data=training, method="nnet")
+ranger_p1 <- predict(ranger_fit, newdata=training)
+ranger_p2 <- predict(ranger_fit, newdata=validation)
+confusionMatrix(ranger_p1, training$classe)$overall
+confusionMatrix(ranger_p2, validation$classe)$overall
+confusionMatrix(ranger_p2, validation$classe)$table
+toc()
+
+tic("Neural Network") #assumes, training/validation are setup
+nnet_fit <- train(classe ~ ., data=training, method="nnet")
+nnet_p1 <- predict(nb_fit, newdata=training)
+nnet_p2 <- predict(nb_fit, newdata=validation)
+confusionMatrix(nnet_p1, training$classe)$overall
+confusionMatrix(nnet_p2, validation$classe)$overall
+confusionMatrix(nnet_p2, validation$classe)$table
+toc()
+
+
+
+
+
+
+
+
+
+
+##############
+# create folds
+flds <- createFolds(training_validation$classe, k = 3, list = TRUE, returnTrain = FALSE)
+names(flds)[1] <- "train"
+flds[[1]]
+
+# then call on training_validation[flds[[k]],  ]  k=0,1,2
+
+
+tic("Parallel Random Forest") #assumes, training/validation are setup
+parRF_fit <- train(classe ~ ., data=training, method="parRF")
+ranger_p1 <- predict(ranger_fit, newdata=training)
+ranger_p2 <- predict(ranger_fit, newdata=validation)
+confusionMatrix(ranger_p1, training$classe)$overall
+confusionMatrix(ranger_p2, validation$classe)$overall
+confusionMatrix(ranger_p2, validation$classe)$table
+toc()
+
+
+
+
+
+############################
+# #
+#  some parallel compute notes
+require(foreach)
+require(doParallel)
+registerDoParallel(cores=4)
+foreach(i=1:4) %dopar% sqrt(i)
+
+trials <- 1000
+x <- iris[which(iris[,5] != "setosa"), c(1,5)]
+ptime <- system.time({ 
+    r <- foreach(icount(trials), .combine=cbind) %dopar% { 
+        ind <- sample(100,100,replace=TRUE)
+        result1 <- glm(x[ind,2]~x[ind,1], family=binomial(logit))
+        coefficients(result1)}
+    })[3]
+ptime
+
+# change dopar to do for single processer
+stime <- system.time({ 
+    r <- foreach(icount(trials), .combine=cbind) %do% { 
+        ind <- sample(100,100,replace=TRUE)
+        result1 <- glm(x[ind,2]~x[ind,1], family=binomial(logit))
+        coefficients(result1)}
+})[3]
+stime

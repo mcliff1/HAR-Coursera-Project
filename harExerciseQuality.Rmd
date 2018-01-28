@@ -65,12 +65,18 @@ validation = training_validation[-inTrain,]
 
 ```
 
-Now we can go ahead and train thde models, in this case we will train 3 models
+
+
+
+Now we can go ahead and train thde models, in this case we will train 3 crossfolds with Random Forest models
 
 ```{r trainModel}
-tic("rf model")
-rf_fit <- train(classe ~ ., data=training, method="rf")
-rf_pred <- predict(rf_fit, newdata=validation)
+flds <- createFolds(training_validation$class3, k = 3, list = TRUE, returnTrain = FALSE)
+
+
+tic("rf model1")
+rf_fit1 <- train(classe ~ ., data=training_validation[[-flds[[1]], ]], method="rf")
+rf_pred1 <- predict(rf_fit1, newdata=validation)
 toc()
 
 tic("gbm model")
