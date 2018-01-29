@@ -350,6 +350,39 @@ confusionMatrix(validation_pred, validation$classe)
 
 
 
+plot(varImp(rf_fit))
+load(file="rf_fit1.RData")
+plot(varImp(rf_fit1), varImp(rf_fit))
 
+plot(rf_fit)
+plot(rf_fit$finalModel)
 
-# combine the confusionMatrix bounds
+##############################################
+#
+#
+#  Try to make plots that show increase in accuracy
+
+d1 <- data.frame(
+    rf1=c(.991,.987,.993),
+    rf2=c(.989,.985,.992),
+    rf3=c(.993,.990,.995)
+)
+rbind(d1, sapply(d1,mean))
+require(dplyr)
+plot(d1)
+
+d1 %>% mutate(mean=mean())
+t(d1)
+names(t(d1))
+sapply(d1,mean)
+nc = (detectCores() -1)
+
+# plot roc curves
+# library(pROC)
+# pred1.prob <- predict(Mod1, val, type="prob")
+# pred1.prob$
+# roc1 <-  roc(val$total_accel_belt, pred1.prob$E)
+# plot(roc1, print.thres="best", print.thres.best.method="closest.topleft")
+# coord1 <- coords(roc1, "best", best.method="closest.topleft",
+#                           ret=c("threshold", "accuracy"))
+# coord1

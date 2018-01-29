@@ -1,12 +1,12 @@
 ---
-title: "HAR Exercise Quality"
+title: "Human Activity Recognition - Exercise Quality"
 author: "Matt Cliff"
 date: "January 29, 2018"
 output: html_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = TRUE, comment=NA)
 require(dplyr)
 require(caret)
 require(rpart)
@@ -16,23 +16,26 @@ require(forecast)
 require(tictoc)
 require(foreach)
 require(doParallel)
-registerDoParallel(cores=detectCores())
+numcores = (detectCores() - 1) # leave one for the user
+registerDoParallel(cores=numcores)
 ```
 
-## Human Activity Recognition
+## Summary Human Activity Recognition
 
-The goal of this report is to predict the manner in which a person is performing a weight lifting exercise. Specifically to detect if the  Unilateral Dumbbell Biceps Curl is being performed according to specification.
+The Human Activity Recognition goal in this report is to predict the manner in which a person is performing a weight lifting exercise. Specifically to detect on a test set if the  Unilateral Dumbbell Biceps Curl is being performed according to the specification.
+In this project, there is  data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. 
+They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: [http://groupware.les.inf.puc-rio.br/har] (see the section on the Weight Lifting Exercise Dataset). The goal is to predict from a testing set the classification on the exercise.
 
 ### Background
-Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement. A group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: (http://groupware.les.inf.puc-rio.br/har) (see the section on the Weight Lifting Exercise Dataset).
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement. A group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. 
 
 Six young health participants were asked to perform one set of 10 repetitions of the Unilateral Dumbbell Biceps Curl in five different fashions: exactly according to the specification (*Class A*), throwing the elbows to the front (*Class B*), lifting the dumbbell only halfway (*Class C*), lowering the dumbbell only halfway (*Class D*) and throwing the hips to the front (*Class E*).
 
-Read more: (http://groupware.les.inf.puc-rio.br/har#ixzz55KOSz1Ls)
+Read more: [http://groupware.les.inf.puc-rio.br/har#ixzz55KOSz1Ls]
 
-
-## Load and Clean Data
-Download and parse the raw data from the provided URLs.
+### Load Data
+Download and parse the raw data from the provided URLs, this is part of a Coursera class exercise and the datasets are modified from the original study and provided on cloudfront.
 
 ```{r loaddata}
 test_datafile <- "./data/pml-testing.csv"
@@ -50,7 +53,7 @@ raw_train <- read.csv(train_datafile)
 raw_test <- read.csv(test_datafile)
 ```
 
-### Clean Data
+##  Data Summary and Feature Extraction
 
 Clear out the columns which are blank, inspection will show that there are $19622$ raw observations with $160$ attributes. The lists *M1* and *M2* show the column names that are missing data, in all cases the number of suspect observations is $19216$ which corresponds to the occurances when **new_window** is true. A view of the testing data will show we have this value as *no* in all cases so it is ok to discard all these attributes.
 
@@ -70,7 +73,7 @@ testing <- select(raw_test, -c(X, user_name, raw_timestamp_part_1, raw_timestamp
 For our purposes we will be using Cross Validation, but we still want to pull a set of data where the outcome is known to measure the accuracy of our models, we will split of a 20% set of data for this purpose.
 
 ```{r splitTrainingValidation}
-inTrain = createDataPartition(training_validation$classe, p = 0.8)[[1]]
+inTrain = createDataPartition(training_validation$classe, p = 0.85)[[1]]
 training = training_validation[ inTrain,]
 validation = training_validation[-inTrain,]
 
@@ -78,9 +81,10 @@ validation = training_validation[-inTrain,]
 flds <- createFolds(training$classe, k = 4, list = TRUE, returnTrain = FALSE)
 ```
 
-## Train
+## Prediction and Modeling
+For our cases, we will do a break down of 4 fold validation, and to summarize we will use the preProcess method built in.  Train 4 models and predict against the fold.
 
-```{r trainModels}
+```{r trainModels, comment=NA}
 tic("rf model1")
 rf_fit1 <- train(classe ~ ., data=training[-flds[[1]], ], method="parRF")
 rf_pred1 <- predict(rf_fit1, newdata=training[ flds[[1]],])
@@ -104,21 +108,6 @@ rf_pred4 <- predict(rf_fit4, newdata=training[ flds[[4]],])
 toc()
 
 ```
-Lets review the results for each of the 4 models on the their cross-validation folds
-
-
-let's look at the results, this would make a nice graph
-
-```{r matrixResults}
-afn <- function(aa,bb) { confusionMatrix(aa,bb)$overall[c(1,3,4)] }
-accuracyResults <- data.frame(cbind(
-    rf1=afn(rf_pred1, training[ flds[[1]],]$classe),
-    rf2=afn(rf_pred2, training[ flds[[2]],]$classe),
-    rf3=afn(rf_pred3, training[ flds[[3]],]$classe),
-    rf4=afn(rf_pred4, training[ flds[[4]],]$classe)
-))
-accuracyResults
-```
 
 Make a combined model by training our 4 CV models on the entire training set and fit. Score this on the validation set, and generate the prediction on the test set
 
@@ -137,9 +126,25 @@ toc()
 
 ```
 
+## Summary
+Lets review the results for each of the 4 models on the their cross-validation folds
 
-Score the combined model on the validation set we held out
-```{r scoreValidation}
+
+```{r matrixResults}
+afn <- function(aa,bb) { confusionMatrix(aa,bb)$overall[c(1,3,4)] }
+accuracyResults <- data.frame(cbind(
+    rf1=afn(rf_pred1, training[ flds[[1]],]$classe),
+    rf2=afn(rf_pred2, training[ flds[[2]],]$classe),
+    rf3=afn(rf_pred3, training[ flds[[3]],]$classe),
+    rf4=afn(rf_pred4, training[ flds[[4]],]$classe)
+)) %>%
+    mutate(mean = mean)
+accuracyResults
+```
+
+
+Score the combined model on the validation set we held out, and we can also compare our score with the interim models
+```{r scoreValidation, comment=NA}
 combined_validation_data <- data.frame(
     rf1_pred = predict(rf_fit1, newdata=validation),
     rf2_pred = predict(rf_fit2, newdata=validation),
@@ -149,12 +154,44 @@ combined_validation_data <- data.frame(
 
 validation_pred <- predict(combined_fit, newdata=combined_validation_data)
 
+accuracyResults <- data.frame(cbind(
+    rf1=afn(combined_validation_data$rf1_pred, validation$classe),
+    rf2=afn(combined_validation_data$rf2_pred, validation$classe),
+    rf3=afn(combined_validation_data$rf3_pred, validation$classe),
+    rf4=afn(combined_validation_data$rf4_pred, validation$classe),
+    combined=afn(validation_pred, validation$classe)
+))
+accuracyResults
+
 # for now just dump the entire matrix
 confusionMatrix(validation_pred, validation$classe)
-```
-And the final prediction is ...
 
-```{r finalPrediction}
+plot(combined_fit, main="Combination of 4-CV Random Forest")
+plot(varImp(combined_fit), top=10)
+```
+
+
+Using the *traincontrol* option we can achieve the same results
+```{r traincontrol}
+tic("run with traincontrol option")
+tc_fit <- train(classe ~ ., data=training, method="parRF", trainControl(method="cv", number=4))
+tc_pred <- predict(tc_fit, newdata=validation)
+toc()
+
+plot(tc_pred, main="Random Forest 4-CV using the trainControl option")
+plot(varImp(tc_pred), top=10)
+# print the error range
+afn(tc_pred, validation$classe)
+```
+
+## Summary
+
+The Random Forest is a very effective method to use, and with cross valdiation the accuracy can be even further improved.
+
+A final calculation shows the predicted classification for the type of exercise for each of the 20 test cases
+
+
+```{r finalPrediction, comment=NA}
 combined_final_data <- data.frame(
     rf1_pred = predict(rf_fit1, newdata=testing),
     rf2_pred = predict(rf_fit2, newdata=testing),
@@ -165,3 +202,21 @@ final_pred <- predict(combined_fit, newdata=combined_final_data)
 
 final_pred
 ```
+And since we have it, a second final prediction using the conditioned model
+```{r finalfinalpred}
+final_pred2 <- predict(tc_fit, newdata=testing)
+
+final_pred2
+```
+
+### Future Steps
+The processing time was intense to train these models.  Although not documented in this report the parallel method provided about a **10x** lift in training the models, this would be one good area of future study to see what architcture may work best for these.
+
+Additionally it would be interesting to continue to increase the folds in validation to see that helps,  and to combare this to using more limited data sets to make an informed comparison of the value in model tuning compared to size of the data set.
+
+
+## References
+Ugulino, W.; Cardador, D.; Vega, K.; Velloso, E.; Milidiu, R.; Fuks, H. Wearable Computing: Accelerometers' Data Classification of Body Postures and Movements. Proceedings of 21st Brazilian Symposium on Artificial Intelligence. Advances in Artificial Intelligence - SBIA 2012. In: Lecture Notes in Computer Science. , pp. 52-61. Curitiba, PR: Springer Berlin / Heidelberg, 2012. ISBN 978-3-642-34458-9. DOI: 10.1007/978-3-642-34459-6_6. 
+
+* [Document](http://groupware.les.inf.puc-rio.br/public/papers/2012.Ugulino.WearableComputing.HAR.Classifier.RIBBON.pdf)
+* [Presentation](http://groupware.les.inf.puc-rio.br/public/2012.SBIA.Ugulino.WearableComputing-Presentation.pdf)
