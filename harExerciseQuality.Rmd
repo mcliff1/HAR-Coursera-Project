@@ -1,7 +1,7 @@
 ---
 title: "HAR Exercise Quality"
 author: "Matt Cliff"
-date: "January 26, 2018"
+date: "January 29, 2018"
 output: html_document
 ---
 
@@ -14,20 +14,25 @@ require(randomForest)
 require(ggplot2)
 require(forecast)
 require(tictoc)
+require(foreach)
+require(doParallel)
+registerDoParallel(cores=detectCores())
 ```
 
 ## Human Activity Recognition
 
-Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement – a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset).
+The goal of this report is to predict the manner in which a person is performing a weight lifting exercise. Specifically to detect if the  Unilateral Dumbbell Biceps Curl is being performed according to specification.
 
-Six young health participants were asked to perform one set of 10 repetitions of the Unilateral Dumbbell Biceps Curl in five different fashions: exactly according to the specification (Class A), throwing the elbows to the front (Class B), lifting the dumbbell only halfway (Class C), lowering the dumbbell only halfway (Class D) and throwing the hips to the front (Class E).
+### Background
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement. A group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: (http://groupware.les.inf.puc-rio.br/har) (see the section on the Weight Lifting Exercise Dataset).
 
-Read more: http://groupware.les.inf.puc-rio.br/har#ixzz55KOSz1Ls
+Six young health participants were asked to perform one set of 10 repetitions of the Unilateral Dumbbell Biceps Curl in five different fashions: exactly according to the specification (*Class A*), throwing the elbows to the front (*Class B*), lifting the dumbbell only halfway (*Class C*), lowering the dumbbell only halfway (*Class D*) and throwing the hips to the front (*Class E*).
+
+Read more: (http://groupware.les.inf.puc-rio.br/har#ixzz55KOSz1Ls)
 
 
-### System Requirements
-Needs at least 2 GB of RAM, initial work was on a windows workstation(I7 core; 16GB RAM) and would take 10 minutes to run a random forest on 19,622 observations with 53 variables.
-
+## Load and Clean Data
+Download and parse the raw data from the provided URLs.
 
 ```{r loaddata}
 test_datafile <- "./data/pml-testing.csv"
@@ -45,9 +50,12 @@ raw_train <- read.csv(train_datafile)
 raw_test <- read.csv(test_datafile)
 ```
 
-## Run Models
+### Clean Data
 
-Clear out the columns which are blank (inspection will )
+Clear out the columns which are blank, inspection will show that there are $19622$ raw observations with $160$ attributes. The lists *M1* and *M2* show the column names that are missing data, in all cases the number of suspect observations is $19216$ which corresponds to the occurances when **new_window** is true. A view of the testing data will show we have this value as *no* in all cases so it is ok to discard all these attributes.
+
+We also discard some of the non predictive attributes such as name, and timestamps.
+
 ```{r cleanData, echo=TRUE}
 M1 <- sapply(raw_train, function(x) sum(is.na(x))); M1 <- M1[M1 > 0]
 M2 <- sapply(raw_train, function(x) sum(x == "", na.rm=TRUE)); M2 <- M2[M2 > 0]
@@ -58,82 +66,102 @@ training_validation <- select(raw_train, -c(X, user_name, raw_timestamp_part_1, 
 testing <- select(raw_test, -c(X, user_name, raw_timestamp_part_1, raw_timestamp_part_2, cvtd_timestamp, new_window, num_window)) %>%
     select( -one_of(names(M1))) %>%
     select( -one_of(names(M2)))
+```
+For our purposes we will be using Cross Validation, but we still want to pull a set of data where the outcome is known to measure the accuracy of our models, we will split of a 20% set of data for this purpose.
 
-inTrain = createDataPartition(training_validation$classe, p = 0.7)[[1]]
+```{r splitTrainingValidation}
+inTrain = createDataPartition(training_validation$classe, p = 0.8)[[1]]
 training = training_validation[ inTrain,]
 validation = training_validation[-inTrain,]
 
+
+flds <- createFolds(training$classe, k = 4, list = TRUE, returnTrain = FALSE)
 ```
 
+## Train
 
-
-
-Now we can go ahead and train thde models, in this case we will train 3 crossfolds with Random Forest models
-
-```{r trainModel}
-flds <- createFolds(training_validation$class3, k = 3, list = TRUE, returnTrain = FALSE)
-
-
+```{r trainModels}
 tic("rf model1")
-rf_fit1 <- train(classe ~ ., data=training_validation[[-flds[[1]], ]], method="rf")
-rf_pred1 <- predict(rf_fit1, newdata=validation)
+rf_fit1 <- train(classe ~ ., data=training[-flds[[1]], ], method="parRF")
+rf_pred1 <- predict(rf_fit1, newdata=training[ flds[[1]],])
 toc()
 
-tic("gbm model")
-gbm_fit <- train(classe ~ ., data=training, method="gbm", verbose=FALSE)
-gbm_pred <- predict(gbm_fit, newdata=validation)
+
+tic("rf model2")
+rf_fit2 <- train(classe ~ ., data=training[-flds[[2]], ], method="parRF")
+rf_pred2 <- predict(rf_fit2, newdata=training[ flds[[2]],])
 toc()
 
-tic("lda model")
-lda_fit <- train(classe ~ ., data=training, method="lda")
-lda_pred <- predict(lda_fit, newdata=validation)
+
+tic("rf model3")
+rf_fit3 <- train(classe ~ ., data=training[-flds[[3]], ], method="parRF")
+rf_pred3 <- predict(rf_fit3, newdata=training[ flds[[3]],])
 toc()
+
+tic("rf model4")
+rf_fit4 <- train(classe ~ ., data=training[-flds[[4]], ], method="parRF")
+rf_pred4 <- predict(rf_fit4, newdata=training[ flds[[4]],])
+toc()
+
 ```
+Lets review the results for each of the 4 models on the their cross-validation folds
 
-That took a while!  let's look at the results
+
+let's look at the results, this would make a nice graph
+
 ```{r matrixResults}
-#lda_fit$finalModel
-#lda_pred
-#confusionMatrix(rf_pred, validation)
-#confusionMatrix(rf_pred, validation)$overall[1]
-
-#confusionMatrix(gbm_pred, validation)$overall[1]
-#confusionMatrix(lda_pred, validation)$overall[1]
-#confusionMatrix(rf_pred, gbm_pred)$overall[1]
-#confusionMatrix(rf_pred, lda_pred)$overall[1]
-#confusionMatrix(gbm_pred, lda_pred)$overall[1]
-
+afn <- function(aa,bb) { confusionMatrix(aa,bb)$overall[c(1,3,4)] }
+accuracyResults <- data.frame(cbind(
+    rf1=afn(rf_pred1, training[ flds[[1]],]$classe),
+    rf2=afn(rf_pred2, training[ flds[[2]],]$classe),
+    rf3=afn(rf_pred3, training[ flds[[3]],]$classe),
+    rf4=afn(rf_pred4, training[ flds[[4]],]$classe)
+))
+accuracyResults
 ```
 
-And finally make an overall final prediction
+Make a combined model by training our 4 CV models on the entire training set and fit. Score this on the validation set, and generate the prediction on the test set
+
 ```{r combined prediction}
 
-rf_pred <- predict(rf_fit, newdata=training)
-gbm_pred <- predict(gbm_fit, newdata=training)
-lda_pred <- predict(lda_fit, newdata=training)
+combined_data <- data.frame(
+    rf1_pred = predict(rf_fit1, newdata=training),
+    rf2_pred = predict(rf_fit2, newdata=training),
+    rf3_pred = predict(rf_fit3, newdata=training),
+    rf4_pred = predict(rf_fit4, newdata=training),
+    classe = training$classe)
 
-predDF <- data.frame(rf_pred, gbm_pred, lda_pred, classe=training$classe)
-#predDF
-
-combModFit <- train(classe ~ ., method="rf", data=predDF)
-
-
-#combPred <- predict(combModFit, predDF)
-#combPred
-
+tic("train our combined model")
+combined_fit <- train(classe ~ ., method="parRF", data=combined_data)
+toc()
 
 ```
-Now,  we have the model that takes the predictions from the other models,   to do a final prediction lets take those trained models and build them on the test set
+
+
+Score the combined model on the validation set we held out
+```{r scoreValidation}
+combined_validation_data <- data.frame(
+    rf1_pred = predict(rf_fit1, newdata=validation),
+    rf2_pred = predict(rf_fit2, newdata=validation),
+    rf3_pred = predict(rf_fit3, newdata=validation),
+    rf4_pred = predict(rf_fit4, newdata=validation),
+    classe = validation$classe)
+
+validation_pred <- predict(combined_fit, newdata=combined_validation_data)
+
+# for now just dump the entire matrix
+confusionMatrix(validation_pred, validation$classe)
+```
+And the final prediction is ...
+
 ```{r finalPrediction}
-rf_pred_final <- predict(rf_fit, newdata=training)
-gbm_pred_final <- predict(gbm_fit, newdata=training)
-lda_pred_final <- predict(lda_fit, newdata=training)
-predDF_final = data.frame(re_pred=rf_pred_final,
-                          gbm_pred=gbm_pred_final, lda_pred=lda_pred_final)
+combined_final_data <- data.frame(
+    rf1_pred = predict(rf_fit1, newdata=testing),
+    rf2_pred = predict(rf_fit2, newdata=testing),
+    rf3_pred = predict(rf_fit3, newdata=testing),
+    rf4_pred = predict(rf_fit4, newdata=testing))
 
-pred_final = predict(combModFit, predDF_final)
+final_pred <- predict(combined_fit, newdata=combined_final_data)
 
-# print them all out together
-data.frame(re_pred=rf_pred_final,                          gbm_pred=gbm_pred_final, lda_pred=lda_pred_final, classe=pred_final)
-
+final_pred
 ```

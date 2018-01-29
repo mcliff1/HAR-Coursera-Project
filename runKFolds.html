@@ -126,7 +126,8 @@ $(document).ready(function () {
 
 <div id="human-activity-recognition" class="section level2">
 <h2>Human Activity Recognition</h2>
-<p>Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement â a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: <a href="http://groupware.les.inf.puc-rio.br/har" class="uri">http://groupware.les.inf.puc-rio.br/har</a> (see the section on the Weight Lifting Exercise Dataset).</p>
+<p>Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement.</p>
+<p>A group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: <a href="http://groupware.les.inf.puc-rio.br/har" class="uri">http://groupware.les.inf.puc-rio.br/har</a> (see the section on the Weight Lifting Exercise Dataset).</p>
 <p>Six young health participants were asked to perform one set of 10 repetitions of the Unilateral Dumbbell Biceps Curl in five different fashions: exactly according to the specification (Class A), throwing the elbows to the front (Class B), lifting the dumbbell only halfway (Class C), lowering the dumbbell only halfway (Class D) and throwing the hips to the front (Class E).</p>
 <p>Read more: <a href="http://groupware.les.inf.puc-rio.br/har#ixzz55KOSz1Ls" class="uri">http://groupware.les.inf.puc-rio.br/har#ixzz55KOSz1Ls</a></p>
 <div id="system-requirements" class="section level3">
@@ -147,8 +148,8 @@ raw_train &lt;- read.csv(train_datafile)
 raw_test &lt;- read.csv(test_datafile)</code></pre>
 </div>
 </div>
-<div id="run-models" class="section level2">
-<h2>Run Models</h2>
+<div id="clean-data" class="section level2">
+<h2>Clean Data</h2>
 <p>Clear out the columns which are blank (inspection will )</p>
 <pre class="r"><code>M1 &lt;- sapply(raw_train, function(x) sum(is.na(x))); M1 &lt;- M1[M1 &gt; 0]
 M2 &lt;- sapply(raw_train, function(x) sum(x == &quot;&quot;, na.rm=TRUE)); M2 &lt;- M2[M2 &gt; 0]
@@ -161,129 +162,252 @@ testing &lt;- select(raw_test, -c(X, user_name, raw_timestamp_part_1, raw_timest
     select( -one_of(names(M2)))
 
 
-inTrain = createDataPartition(training_validation$classe, p = 0.7)[[1]]
+# we are going to do CV training, so the validation set is a pretty small slice just for predicting accuracy
+inTrain = createDataPartition(training_validation$classe, p = 0.9)[[1]]
 training = training_validation[ inTrain,]
 validation = training_validation[-inTrain,]</code></pre>
 <p>Now we can go ahead and train thde models, in this case we will train 3 crossfolds with Random Forest models</p>
-<pre class="r"><code>flds &lt;- createFolds(training_validation$classe, k = 3, list = TRUE, returnTrain = FALSE)
+<pre class="r"><code>flds &lt;- createFolds(training$classe, k = 4, list = TRUE, returnTrain = FALSE)
 
 
 tic(&quot;rf model1&quot;)
-rf_fit1 &lt;- train(classe ~ ., data=training_validation[-flds[[1]], ], method=&quot;parRF&quot;)</code></pre>
-<pre><code>## Warning: executing %dopar% sequentially: no parallel backend registered</code></pre>
-<pre class="r"><code>rf_pred1 &lt;- predict(rf_fit1, newdata=training_validation[ flds[[1]],])
+rf_fit1 &lt;- train(classe ~ ., data=training[-flds[[1]], ], method=&quot;parRF&quot;)
+rf_pred1 &lt;- predict(rf_fit1, newdata=training[ flds[[1]],])
 toc()</code></pre>
-<pre><code>## rf model1: 2043.05 sec elapsed</code></pre>
+<pre><code>## rf model1: 668.28 sec elapsed</code></pre>
 <pre class="r"><code>tic(&quot;rf model2&quot;)
-rf_fit2 &lt;- train(classe ~ ., data=training_validation[-flds[[2]], ], method=&quot;parRF&quot;)
-rf_pred2 &lt;- predict(rf_fit2, newdata=training_validation[ flds[[2]],])
+rf_fit2 &lt;- train(classe ~ ., data=training[-flds[[2]], ], method=&quot;parRF&quot;)
+rf_pred2 &lt;- predict(rf_fit2, newdata=training[ flds[[2]],])
 toc()</code></pre>
-<pre><code>## rf model2: 2028.83 sec elapsed</code></pre>
+<pre><code>## rf model2: 640.33 sec elapsed</code></pre>
 <pre class="r"><code>tic(&quot;rf model3&quot;)
-rf_fit3 &lt;- train(classe ~ ., data=training_validation[-flds[[3]], ], method=&quot;parRF&quot;)
-rf_pred3 &lt;- predict(rf_fit3, newdata=training_validation[ flds[[3]],])
+rf_fit3 &lt;- train(classe ~ ., data=training[-flds[[3]], ], method=&quot;parRF&quot;)
+rf_pred3 &lt;- predict(rf_fit3, newdata=training[ flds[[3]],])
 toc()</code></pre>
-<pre><code>## rf model3: 2015.43 sec elapsed</code></pre>
+<pre><code>## rf model3: 649.29 sec elapsed</code></pre>
+<pre class="r"><code>tic(&quot;rf model4&quot;)
+rf_fit4 &lt;- train(classe ~ ., data=training[-flds[[4]], ], method=&quot;parRF&quot;)
+rf_pred4 &lt;- predict(rf_fit4, newdata=training[ flds[[4]],])
+toc()</code></pre>
+<pre><code>## rf model4: 713.33 sec elapsed</code></pre>
 <p>That took a while! let’s look at the results</p>
-<pre class="r"><code>#lda_fit$finalModel
-#lda_pred
-confusionMatrix(rf_pred1, training_validation[ flds[[1]],]$classe)</code></pre>
+<pre class="r"><code>#confusionMatrix(rf_pred1, training[ flds[[1]],]$classe)$overall
+confusionMatrix(rf_pred1, training[ flds[[1]],]$classe)</code></pre>
 <pre><code>## Confusion Matrix and Statistics
 ## 
 ##           Reference
 ## Prediction    A    B    C    D    E
-##          A 1856   10    0    0    0
-##          B    0 1251   12    1    1
-##          C    4    4 1126   15    2
-##          D    0    0    3 1054    1
-##          E    0    0    0    2 1198
+##          A 1255    7    0    0    0
+##          B    0  843    3    1    0
+##          C    1    5  763    6    3
+##          D    0    0    4  715    0
+##          E    0    0    0    1  809
 ## 
 ## Overall Statistics
 ##                                           
-##                Accuracy : 0.9916          
-##                  95% CI : (0.9891, 0.9937)
+##                Accuracy : 0.993           
+##                  95% CI : (0.9901, 0.9952)
 ##     No Information Rate : 0.2844          
 ##     P-Value [Acc &gt; NIR] : &lt; 2.2e-16       
 ##                                           
-##                   Kappa : 0.9894          
+##                   Kappa : 0.9911          
 ##  Mcnemar's Test P-Value : NA              
 ## 
 ## Statistics by Class:
 ## 
 ##                      Class: A Class: B Class: C Class: D Class: E
-## Sensitivity            0.9978   0.9889   0.9869   0.9832   0.9967
-## Specificity            0.9979   0.9973   0.9954   0.9993   0.9996
-## Pos Pred Value         0.9946   0.9889   0.9783   0.9962   0.9983
-## Neg Pred Value         0.9991   0.9973   0.9972   0.9967   0.9993
-## Prevalence             0.2844   0.1934   0.1745   0.1639   0.1838
-## Detection Rate         0.2838   0.1913   0.1722   0.1612   0.1832
-## Detection Prevalence   0.2853   0.1934   0.1760   0.1618   0.1835
-## Balanced Accuracy      0.9979   0.9931   0.9911   0.9912   0.9981</code></pre>
-<pre class="r"><code>confusionMatrix(rf_pred2, training_validation[ flds[[2]],]$classe)</code></pre>
+## Sensitivity            0.9992   0.9860   0.9909   0.9889   0.9963
+## Specificity            0.9978   0.9989   0.9959   0.9989   0.9997
+## Pos Pred Value         0.9945   0.9953   0.9807   0.9944   0.9988
+## Neg Pred Value         0.9997   0.9966   0.9981   0.9978   0.9992
+## Prevalence             0.2844   0.1936   0.1744   0.1637   0.1839
+## Detection Rate         0.2842   0.1909   0.1728   0.1619   0.1832
+## Detection Prevalence   0.2858   0.1918   0.1762   0.1628   0.1834
+## Balanced Accuracy      0.9985   0.9924   0.9934   0.9939   0.9980</code></pre>
+<pre class="r"><code>confusionMatrix(rf_pred2, training[ flds[[2]],]$classe)</code></pre>
 <pre><code>## Confusion Matrix and Statistics
 ## 
 ##           Reference
 ## Prediction    A    B    C    D    E
-##          A 1857    3    0    0    0
-##          B    3 1262    1    0    0
-##          C    0    1 1137    7    1
-##          D    0    0    3 1065    5
-##          E    0    0    0    0 1197
+##          A 1254    6    0    0    0
+##          B    1  847    4    0    0
+##          C    1    2  763   10    0
+##          D    0    0    3  714    1
+##          E    0    0    0    0  810
 ## 
 ## Overall Statistics
 ##                                           
-##                Accuracy : 0.9963          
-##                  95% CI : (0.9945, 0.9976)
+##                Accuracy : 0.9937          
+##                  95% CI : (0.9908, 0.9958)
+##     No Information Rate : 0.2844          
+##     P-Value [Acc &gt; NIR] : &lt; 2.2e-16       
+##                                           
+##                   Kappa : 0.992           
+##  Mcnemar's Test P-Value : NA              
+## 
+## Statistics by Class:
+## 
+##                      Class: A Class: B Class: C Class: D Class: E
+## Sensitivity            0.9984   0.9906   0.9909   0.9862   0.9988
+## Specificity            0.9981   0.9986   0.9964   0.9989   1.0000
+## Pos Pred Value         0.9952   0.9941   0.9832   0.9944   1.0000
+## Neg Pred Value         0.9994   0.9978   0.9981   0.9973   0.9997
+## Prevalence             0.2844   0.1936   0.1744   0.1639   0.1837
+## Detection Rate         0.2840   0.1918   0.1728   0.1617   0.1834
+## Detection Prevalence   0.2853   0.1929   0.1757   0.1626   0.1834
+## Balanced Accuracy      0.9983   0.9946   0.9937   0.9926   0.9994</code></pre>
+<pre class="r"><code>confusionMatrix(rf_pred3, training[ flds[[3]],]$classe)</code></pre>
+<pre><code>## Confusion Matrix and Statistics
+## 
+##           Reference
+## Prediction    A    B    C    D    E
+##          A 1255    5    0    0    0
+##          B    0  845    4    0    0
+##          C    0    4  764   14    0
+##          D    0    0    2  710    1
+##          E    0    0    0    0  811
+## 
+## Overall Statistics
+##                                           
+##                Accuracy : 0.9932          
+##                  95% CI : (0.9903, 0.9954)
 ##     No Information Rate : 0.2843          
 ##     P-Value [Acc &gt; NIR] : &lt; 2.2e-16       
 ##                                           
-##                   Kappa : 0.9954          
+##                   Kappa : 0.9914          
 ##  Mcnemar's Test P-Value : NA              
 ## 
 ## Statistics by Class:
 ## 
 ##                      Class: A Class: B Class: C Class: D Class: E
-## Sensitivity            0.9984   0.9968   0.9965   0.9935   0.9950
-## Specificity            0.9994   0.9992   0.9983   0.9985   1.0000
-## Pos Pred Value         0.9984   0.9968   0.9921   0.9925   1.0000
-## Neg Pred Value         0.9994   0.9992   0.9993   0.9987   0.9989
-## Prevalence             0.2843   0.1935   0.1744   0.1639   0.1839
-## Detection Rate         0.2839   0.1929   0.1738   0.1628   0.1830
-## Detection Prevalence   0.2843   0.1935   0.1752   0.1640   0.1830
-## Balanced Accuracy      0.9989   0.9980   0.9974   0.9960   0.9975</code></pre>
-<pre class="r"><code>confusionMatrix(rf_pred3, training_validation[ flds[[3]],]$classe)</code></pre>
+## Sensitivity            1.0000   0.9895   0.9922   0.9807   0.9988
+## Specificity            0.9984   0.9989   0.9951   0.9992   1.0000
+## Pos Pred Value         0.9960   0.9953   0.9770   0.9958   1.0000
+## Neg Pred Value         1.0000   0.9975   0.9983   0.9962   0.9997
+## Prevalence             0.2843   0.1934   0.1744   0.1640   0.1839
+## Detection Rate         0.2843   0.1914   0.1730   0.1608   0.1837
+## Detection Prevalence   0.2854   0.1923   0.1771   0.1615   0.1837
+## Balanced Accuracy      0.9992   0.9942   0.9936   0.9899   0.9994</code></pre>
+<pre class="r"><code>confusionMatrix(rf_pred4, training[ flds[[3]],]$classe)</code></pre>
 <pre><code>## Confusion Matrix and Statistics
 ## 
 ##           Reference
 ## Prediction    A    B    C    D    E
-##          A 1859    7    0    0    0
-##          B    1 1255    7    0    0
-##          C    0    4 1133   18    3
-##          D    0    0    0 1054    2
-##          E    0    0    0    0 1197
+##          A 1251    5    0    0    0
+##          B    2  844    3    0    0
+##          C    1    5  765   13    0
+##          D    0    0    2  709    2
+##          E    1    0    0    2  810
 ## 
 ## Overall Statistics
 ##                                           
-##                Accuracy : 0.9936          
-##                  95% CI : (0.9913, 0.9954)
-##     No Information Rate : 0.2844          
+##                Accuracy : 0.9918          
+##                  95% CI : (0.9887, 0.9943)
+##     No Information Rate : 0.2843          
 ##     P-Value [Acc &gt; NIR] : &lt; 2.2e-16       
 ##                                           
-##                   Kappa : 0.9919          
+##                   Kappa : 0.9897          
 ##  Mcnemar's Test P-Value : NA              
 ## 
 ## Statistics by Class:
 ## 
 ##                      Class: A Class: B Class: C Class: D Class: E
-## Sensitivity            0.9995   0.9913   0.9939   0.9832   0.9958
-## Specificity            0.9985   0.9985   0.9954   0.9996   1.0000
-## Pos Pred Value         0.9962   0.9937   0.9784   0.9981   1.0000
-## Neg Pred Value         0.9998   0.9979   0.9987   0.9967   0.9991
-## Prevalence             0.2844   0.1936   0.1743   0.1639   0.1838
-## Detection Rate         0.2843   0.1919   0.1732   0.1612   0.1830
-## Detection Prevalence   0.2853   0.1931   0.1771   0.1615   0.1830
-## Balanced Accuracy      0.9990   0.9949   0.9946   0.9914   0.9979</code></pre>
-<pre class="r"><code>#confusionMatrix(rf_pred, validation)$overall[1]</code></pre>
+## Sensitivity            0.9968   0.9883   0.9935   0.9793   0.9975
+## Specificity            0.9984   0.9986   0.9948   0.9989   0.9992
+## Pos Pred Value         0.9960   0.9941   0.9758   0.9944   0.9963
+## Neg Pred Value         0.9987   0.9972   0.9986   0.9959   0.9994
+## Prevalence             0.2843   0.1934   0.1744   0.1640   0.1839
+## Detection Rate         0.2834   0.1912   0.1733   0.1606   0.1835
+## Detection Prevalence   0.2845   0.1923   0.1776   0.1615   0.1841
+## Balanced Accuracy      0.9976   0.9934   0.9941   0.9891   0.9984</code></pre>
+<p>Now lets go ahead and combine these to make a final prediction, first we combine to make the prediction model</p>
+<pre class="r"><code># make a dataframe using the full training set
+combined_data &lt;- data.frame(
+    rf1_pred = predict(rf_fit1, newdata=training), 
+    rf2_pred = predict(rf_fit2, newdata=training), 
+    rf3_pred = predict(rf_fit3, newdata=training), 
+    rf4_pred = predict(rf_fit4, newdata=training), 
+    classe = training$classe)
+
+
+tic(&quot;fit combined model&quot;)
+combined_fit &lt;- train(classe ~ ., data=combined_data, method=&quot;parRF&quot;)
+toc()</code></pre>
+<pre><code>## fit combined model: 85 sec elapsed</code></pre>
+<pre class="r"><code># now predict and score on the validation data
+combined_validation &lt;- data.frame(
+    rf1_pred = predict(rf_fit1, newdata=validation), 
+    rf2_pred = predict(rf_fit2, newdata=validation), 
+    rf3_pred = predict(rf_fit3, newdata=validation),
+    rf4_pred = predict(rf_fit4, newdata=validation)
+)
+validation_pred &lt;- predict(combined_fit, newdata=combined_validation)
+confusionMatrix(validation_pred, validation$classe)</code></pre>
+<pre><code>## Confusion Matrix and Statistics
+## 
+##           Reference
+## Prediction   A   B   C   D   E
+##          A 558   1   0   0   0
+##          B   0 378   3   0   0
+##          C   0   0 339   2   0
+##          D   0   0   0 319   0
+##          E   0   0   0   0 360
+## 
+## Overall Statistics
+##                                           
+##                Accuracy : 0.9969          
+##                  95% CI : (0.9933, 0.9989)
+##     No Information Rate : 0.2847          
+##     P-Value [Acc &gt; NIR] : &lt; 2.2e-16       
+##                                           
+##                   Kappa : 0.9961          
+##  Mcnemar's Test P-Value : NA              
+## 
+## Statistics by Class:
+## 
+##                      Class: A Class: B Class: C Class: D Class: E
+## Sensitivity            1.0000   0.9974   0.9912   0.9938   1.0000
+## Specificity            0.9993   0.9981   0.9988   1.0000   1.0000
+## Pos Pred Value         0.9982   0.9921   0.9941   1.0000   1.0000
+## Neg Pred Value         1.0000   0.9994   0.9981   0.9988   1.0000
+## Prevalence             0.2847   0.1934   0.1745   0.1638   0.1837
+## Detection Rate         0.2847   0.1929   0.1730   0.1628   0.1837
+## Detection Prevalence   0.2852   0.1944   0.1740   0.1628   0.1837
+## Balanced Accuracy      0.9996   0.9977   0.9950   0.9969   1.0000</code></pre>
+<p>And lastly make a prediction on the 20 samples</p>
+<pre class="r"><code>final_testdata &lt;- data.frame(
+    rf1_pred = predict(rf_fit1, newdata=testing), 
+    rf2_pred = predict(rf_fit2, newdata=testing), 
+    rf3_pred = predict(rf_fit3, newdata=testing),
+    rf4_pred = predict(rf_fit4, newdata=testing)
+)
+final_testdata</code></pre>
+<pre><code>##    rf1_pred rf2_pred rf3_pred rf4_pred
+## 1         B        B        B        B
+## 2         A        A        A        A
+## 3         B        B        B        B
+## 4         A        A        A        A
+## 5         A        A        A        A
+## 6         E        E        E        E
+## 7         D        D        D        D
+## 8         B        B        B        B
+## 9         A        A        A        A
+## 10        A        A        A        A
+## 11        B        B        B        B
+## 12        C        C        C        C
+## 13        B        B        B        B
+## 14        A        A        A        A
+## 15        E        E        E        E
+## 16        E        E        E        E
+## 17        A        A        A        A
+## 18        B        B        B        B
+## 19        B        B        B        B
+## 20        B        B        B        B</code></pre>
+<pre class="r"><code>final_pred &lt;- predict(combined_fit, newdata=final_testdata)
+final_pred</code></pre>
+<pre><code>##  [1] B A B A A E D B A A B C B A E E A B B B
+## Levels: A B C D E</code></pre>
+<p>Viola</p>
 </div>
 
 

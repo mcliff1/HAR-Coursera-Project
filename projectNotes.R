@@ -254,10 +254,13 @@ toc()
 #  some parallel compute notes
 require(foreach)
 require(doParallel)
-registerDoParallel(cores=4)
+registerDoParallel(cores=detectCores())
 foreach(i=1:4) %dopar% sqrt(i)
 
-trials <- 1000
+
+
+
+trials <- 10000
 x <- iris[which(iris[,5] != "setosa"), c(1,5)]
 ptime <- system.time({ 
     r <- foreach(icount(trials), .combine=cbind) %dopar% { 
@@ -275,3 +278,78 @@ stime <- system.time({
         coefficients(result1)}
 })[3]
 stime
+
+
+
+
+##################################################
+#
+#  Attempt #3, 
+#
+raw_train <- read.csv(train_datafile)
+raw_test <- read.csv(test_datafile)
+M1 <- sapply(raw_train, function(x) sum(is.na(x))); M1 <- M1[M1 > 0]
+M2 <- sapply(raw_train, function(x) sum(x == "", na.rm=TRUE)); M2 <- M2[M2 > 0]
+training_validation <- select(raw_train, -c(X, user_name, raw_timestamp_part_1, raw_timestamp_part_2, cvtd_timestamp, new_window, num_window)) %>%
+    select( -one_of(names(M1))) %>%
+    select( -one_of(names(M2)))
+
+testing <- select(raw_test, -c(X, user_name, raw_timestamp_part_1, raw_timestamp_part_2, cvtd_timestamp, new_window, num_window)) %>%
+    select( -one_of(names(M1))) %>%
+    select( -one_of(names(M2)))
+inTrain = createDataPartition(training_validation$classe, p = 0.9)[[1]]
+training = training_validation[ inTrain,]
+validation = training_validation[-inTrain,]
+flds <- createFolds(training$classe, k = 3, list = TRUE, returnTrain = FALSE)
+
+
+tic("rf model1")
+rf_fit1 <- train(classe ~ ., data=training[-flds[[1]], ], method="parRF")
+rf_pred1 <- predict(rf_fit1, newdata=training[ flds[[1]],])
+toc()
+save(rf_fit1, file="rf_fit1.RData")
+
+tic("rf model2")
+rf_fit2 <- train(classe ~ ., data=training[-flds[[2]], ], method="parRF")
+rf_pred2 <- predict(rf_fit2, newdata=training[ flds[[2]],])
+toc()
+save(rf_fit2, file="rf_fit2.RData")
+
+
+tic("rf model3")
+rf_fit3 <- train(classe ~ ., data=training[-flds[[3]], ], method="parRF")
+rf_pred3 <- predict(rf_fit3, newdata=training[ flds[[3]],])
+toc()
+save(rf_fit3, file="rf_fit3.RData")
+
+
+
+confusionMatrix(rf_pred1, training[ flds[[1]],]$classe)
+confusionMatrix(rf_pred2, training[ flds[[2]],]$classe)
+confusionMatrix(rf_pred3, training[ flds[[3]],]$classe)
+
+combined_data <- data.frame(
+    rf1_pred = predict(rf_fit1, newdata=training), 
+    rf2_pred = predict(rf_fit2, newdata=training), 
+    rf3_pred = predict(rf_fit3, newdata=training), 
+    classe = training$classe)
+
+tic("fit combined model")
+combined_fit <- train(classe ~ ., data=combined_data, method="parRF")
+toc()
+save(combined_fit, file="combined_fit.RData")
+
+combined_validation <- data.frame(
+    rf1_pred = predict(rf_fit1, newdata=validation), 
+    rf2_pred = predict(rf_fit2, newdata=validation), 
+    rf3_pred = predict(rf_fit3, newdata=validation)
+)
+validation_pred <- predict(combined_fit, newdata=combined_validation)
+confusionMatrix(validation_pred, validation$classe)
+
+
+
+
+
+
+# combine the confusionMatrix bounds

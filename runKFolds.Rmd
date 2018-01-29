@@ -16,7 +16,7 @@ require(forecast)
 require(tictoc)
 require(foreach)
 require(doParallel)
-registerDoParallel(cores=4)
+registerDoParallel(cores=6)
 ```
 
 ## Human Activity Recognition
@@ -50,7 +50,7 @@ raw_train <- read.csv(train_datafile)
 raw_test <- read.csv(test_datafile)
 ```
 
-## Run Models
+## Clean Data
 
 Clear out the columns which are blank (inspection will )
 ```{r cleanData, echo=TRUE}
@@ -65,7 +65,8 @@ testing <- select(raw_test, -c(X, user_name, raw_timestamp_part_1, raw_timestamp
     select( -one_of(names(M2)))
 
 
-inTrain = createDataPartition(training_validation$classe, p = 0.7)[[1]]
+# we are going to do CV training, so the validation set is a pretty small slice just for predicting accuracy
+inTrain = createDataPartition(training_validation$classe, p = 0.9)[[1]]
 training = training_validation[ inTrain,]
 validation = training_validation[-inTrain,]
 
@@ -74,37 +75,41 @@ validation = training_validation[-inTrain,]
 Now we can go ahead and train thde models, in this case we will train 3 crossfolds with Random Forest models
 
 ```{r trainModel}
-flds <- createFolds(training_validation$classe, k = 3, list = TRUE, returnTrain = FALSE)
+flds <- createFolds(training$classe, k = 4, list = TRUE, returnTrain = FALSE)
 
 
 tic("rf model1")
-rf_fit1 <- train(classe ~ ., data=training_validation[-flds[[1]], ], method="parRF")
-rf_pred1 <- predict(rf_fit1, newdata=training_validation[ flds[[1]],])
+rf_fit1 <- train(classe ~ ., data=training[-flds[[1]], ], method="parRF")
+rf_pred1 <- predict(rf_fit1, newdata=training[ flds[[1]],])
 toc()
 
 
 tic("rf model2")
-rf_fit2 <- train(classe ~ ., data=training_validation[-flds[[2]], ], method="parRF")
-rf_pred2 <- predict(rf_fit2, newdata=training_validation[ flds[[2]],])
+rf_fit2 <- train(classe ~ ., data=training[-flds[[2]], ], method="parRF")
+rf_pred2 <- predict(rf_fit2, newdata=training[ flds[[2]],])
 toc()
 
 
 tic("rf model3")
-rf_fit3 <- train(classe ~ ., data=training_validation[-flds[[3]], ], method="parRF")
-rf_pred3 <- predict(rf_fit3, newdata=training_validation[ flds[[3]],])
+rf_fit3 <- train(classe ~ ., data=training[-flds[[3]], ], method="parRF")
+rf_pred3 <- predict(rf_fit3, newdata=training[ flds[[3]],])
 toc()
+
+tic("rf model4")
+rf_fit4 <- train(classe ~ ., data=training[-flds[[4]], ], method="parRF")
+rf_pred4 <- predict(rf_fit4, newdata=training[ flds[[4]],])
+toc()
+
 ```
 
 
 That took a while!  let's look at the results
 ```{r matrixResults}
-#lda_fit$finalModel
-#lda_pred
-confusionMatrix(rf_pred1, training_validation[ flds[[1]],]$classe)
-confusionMatrix(rf_pred2, training_validation[ flds[[2]],]$classe)
-confusionMatrix(rf_pred3, training_validation[ flds[[3]],]$classe)
-#confusionMatrix(rf_pred, validation)$overall[1]
-
+#confusionMatrix(rf_pred1, training[ flds[[1]],]$classe)$overall
+confusionMatrix(rf_pred1, training[ flds[[1]],]$classe)
+confusionMatrix(rf_pred2, training[ flds[[2]],]$classe)
+confusionMatrix(rf_pred3, training[ flds[[3]],]$classe)
+confusionMatrix(rf_pred4, training[ flds[[3]],]$classe)
 
 ```
 Now lets go ahead and combine these to make a final prediction, first we combine to make the prediction model
@@ -112,19 +117,41 @@ Now lets go ahead and combine these to make a final prediction, first we combine
 ```{r combPredictionModel}
 
 
-# make a dataframe using the full training_validation set
+# make a dataframe using the full training set
 combined_data <- data.frame(
-    rf1_pred = predict(rf_fit1, newdata_training_validation), 
-    rf2_pred = predict(rf_fit2, newdata_training_validation), 
-    rf3_pred = predict(rf_fit3, newdata_training_validation), 
-    classe=training_validation$classe)
+    rf1_pred = predict(rf_fit1, newdata=training), 
+    rf2_pred = predict(rf_fit2, newdata=training), 
+    rf3_pred = predict(rf_fit3, newdata=training), 
+    rf4_pred = predict(rf_fit4, newdata=training), 
+    classe = training$classe)
 
 
 tic("fit combined model")
 combined_fit <- train(classe ~ ., data=combined_data, method="parRF")
-combined_pred <- predict(combined_fit, newdata=combined_data)
 toc()
 
-confusionMatrix(combined_pred, combined_data$classe)
+# now predict and score on the validation data
+combined_validation <- data.frame(
+    rf1_pred = predict(rf_fit1, newdata=validation), 
+    rf2_pred = predict(rf_fit2, newdata=validation), 
+    rf3_pred = predict(rf_fit3, newdata=validation),
+    rf4_pred = predict(rf_fit4, newdata=validation)
+)
+validation_pred <- predict(combined_fit, newdata=combined_validation)
+confusionMatrix(validation_pred, validation$classe)
+```
+And lastly make a prediction on the 20 samples
+
+```{r finalPrediction}
+final_testdata <- data.frame(
+    rf1_pred = predict(rf_fit1, newdata=testing), 
+    rf2_pred = predict(rf_fit2, newdata=testing), 
+    rf3_pred = predict(rf_fit3, newdata=testing),
+    rf4_pred = predict(rf_fit4, newdata=testing)
+)
+final_testdata
+final_pred <- predict(combined_fit, newdata=final_testdata)
+final_pred
+
 ```
 Viola
