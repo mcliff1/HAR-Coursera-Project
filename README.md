@@ -1,9 +1,10 @@
 # HAR-Coursera-Project
 Machine Learning Course project on classifying quality of exercise using HAR (Human Activity Reporting) data
+The [final report](https://mcliff1.github.io/HAR-Coursera-Project/harExerciseQuality.html) is available for viewing.
 
 ## Getting Started
 
-The [harExerciseQuality.Rmd] markdown can be opened and run, you will need a multicore machine with at least 4 GB or RAM.  On my local workstation this would take about an hour to run.
+The (harExerciseQuality.Rmd) markdown can be opened and run, you will need a multicore machine with at least 4 GB or RAM.  On my local workstation this would take about an hour to run.
 
 
 ## Data
