@@ -137,8 +137,7 @@ accuracyResults <- data.frame(cbind(
     rf2=afn(rf_pred2, training[ flds[[2]],]$classe),
     rf3=afn(rf_pred3, training[ flds[[3]],]$classe),
     rf4=afn(rf_pred4, training[ flds[[4]],]$classe)
-)) %>%
-    mutate(mean = mean)
+))
 accuracyResults
 ```
 
