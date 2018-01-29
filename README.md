@@ -3,21 +3,8 @@ Machine Learning Course project on classifying quality of exercise using HAR (Hu
 
 ## Getting Started
 
-Instructions on how to read/review the contents in here
+The [harExerciseQuality.Rmd] markdown can be opened and run, you will need a multicore machine with at least 4 GB or RAM.  On my local workstation this would take about an hour to run.
 
-### Prerequisites
-
-Anything specific needed to install
-
-```
-Give Examples
-```
-
-If needed repeat
-
-```
-How to run everything example
-```
 
 ## Data
 
@@ -33,12 +20,7 @@ The data for this project came from the source (http://groupware.les.inf.puc-rio
 
 Matt Cliff
 
-## License
-
-Is this really necessary?
 
 ## Acknowledgements
 
-* anyone whos code was used
-* Inspiration
-* etc
+* Coursera Data Science Program
