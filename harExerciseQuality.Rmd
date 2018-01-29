@@ -16,8 +16,8 @@ require(forecast)
 require(tictoc)
 require(foreach)
 require(doParallel)
-numcores = (detectCores() - 1) # leave one for the user
-registerDoParallel(cores=numcores)
+numcores = (detectCores() - 4) # leave one for the user
+registerDoParallel(cores=10)
 ```
 
 ## Summary Human Activity Recognition
@@ -127,7 +127,7 @@ toc()
 ```
 
 ## Summary
-Lets review the results for each of the 4 models on the their cross-validation folds
+Lets review the results for each of the 4 models on the their cross-validation folds. These scores would represent an accuracy on the hold-out fourth fold based on training on the other 3 parts of the dataset.
 
 
 ```{r matrixResults}
@@ -142,7 +142,7 @@ accuracyResults
 ```
 
 
-Score the combined model on the validation set we held out, and we can also compare our score with the interim models
+Score the combined model on the validation set we held out, and we can also compare our score with the interim models. As you can see by combining these results into another tree we get further improvement
 ```{r scoreValidation, comment=NA}
 combined_validation_data <- data.frame(
     rf1_pred = predict(rf_fit1, newdata=validation),
@@ -165,22 +165,22 @@ accuracyResults
 # for now just dump the entire matrix
 confusionMatrix(validation_pred, validation$classe)
 
-plot(combined_fit, main="Combination of 4-CV Random Forest")
-plot(varImp(combined_fit), top=10)
+#plot(combined_fit, main="Combination of 4-CV Random Forest")
+#plot(varImp(combined_fit), top=10)
 ```
 
 
 Using the *traincontrol* option we can achieve the same results
 ```{r traincontrol}
 tic("run with traincontrol option")
-tc_fit <- train(classe ~ ., data=training, method="parRF", trainControl(method="cv", number=4))
+tc_fit <- train(classe ~ ., data=training, method="parRF", trainControl=trainControl(method="cv", number=4))
 tc_pred <- predict(tc_fit, newdata=validation)
 toc()
-
-plot(tc_pred, main="Random Forest 4-CV using the trainControl option")
-plot(varImp(tc_pred), top=10)
 # print the error range
 afn(tc_pred, validation$classe)
+
+plot(tc_fit, main="Random Forest 4-CV using the trainControl option")
+plot(varImp(tc_fit), top=10)
 ```
 
 ## Summary
